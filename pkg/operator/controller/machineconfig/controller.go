@@ -88,12 +88,11 @@ func (r *MachineConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			// Request object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
 			// Return and don't requeue
-			r.Log.Info("NodeObservabilityMachineConfig resource not found. Ignoring could have been deleted", "name", req.NamespacedName.Name)
+			r.Log.Info("NodeObservabilityMachineConfig resource not found. Ignoring could have been deleted", "Name", req.NamespacedName.Name)
 			return ctrl.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
-		r.Log.Error(err, "failed to fetch NodeObservabilityMachineConfig")
-		return ctrl.Result{RequeueAfter: defaultRequeueTime}, err
+		return ctrl.Result{RequeueAfter: defaultRequeueTime}, fmt.Errorf("failed to fetch NodeObservabilityMachineConfig: %w", err)
 	}
 	r.Log.V(3).Info("NodeObservabilityMachineConfig resource found")
 
@@ -104,9 +103,8 @@ func (r *MachineConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		if r.CtrlConfig.Status.IsMachineConfigInProgress() {
 			r.CtrlConfig.Status.UpdateLastReconcileTime()
 			if errUpdate := r.updateStatus(ctx); errUpdate != nil {
-				r.Log.Error(err, "failed to update cleanup status")
 				result = ctrl.Result{RequeueAfter: 1 * time.Minute}
-				err = utilerrors.NewAggregate([]error{err, errUpdate})
+				err = utilerrors.NewAggregate([]error{err, fmt.Errorf("failed to update cleanup status: %w", errUpdate)})
 			}
 		}
 		return
@@ -124,7 +122,7 @@ func (r *MachineConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		diff := time.Since(r.CtrlConfig.Status.LastReconcile.Time).Round(time.Second)
 		if diff < time.Minute && diff >= 0 {
 			next := time.Minute - diff
-			r.Log.Info("reconciler called earlier than expected", "next reconcile in", next.String())
+			r.Log.Info("Reconciler called earlier than expected", "NextReconcileIn", next.String())
 			return ctrl.Result{Requeue: true, RequeueAfter: next}, nil
 		}
 	}
@@ -132,22 +130,20 @@ func (r *MachineConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	defer func() {
 		r.CtrlConfig.Status.UpdateLastReconcileTime()
 		if errUpdate := r.updateStatus(ctx); errUpdate != nil {
-			r.Log.Error(err, "failed to update status")
 			result = ctrl.Result{RequeueAfter: 1 * time.Minute}
-			err = utilerrors.NewAggregate([]error{err, errUpdate})
+			err = utilerrors.NewAggregate([]error{err, fmt.Errorf("failed to update status: %w", errUpdate)})
 		}
 	}()
 
 	requeue, err := r.inspectProfilingMCReq(ctx)
 	if err != nil {
-		r.Log.Error(err, "failed to reconcile requested configuration")
-		return ctrl.Result{RequeueAfter: 1 * time.Minute}, err
+		return ctrl.Result{RequeueAfter: 1 * time.Minute}, fmt.Errorf("failed to reconcile requested configuration: %w", err)
 	}
 	// if the configuration changes were made in the current reconciling
 	// will requeue to avoid the existing status of MCP to be considered
 	// and allow MCO to pick the changes and update correct state
 	if requeue {
-		r.Log.Info("updated configurations, reconcile again in 2 minutes")
+		r.Log.Info("Updated configurations, reconcile again in 2 minutes")
 		return ctrl.Result{RequeueAfter: 2 * time.Minute}, nil
 	}
 
@@ -183,12 +179,12 @@ func (r *MachineConfigReconciler) cleanUp(ctx context.Context, req ctrl.Request)
 	if !r.CtrlConfig.Status.IsMachineConfigInProgress() {
 		if !r.CtrlConfig.Status.IsDebuggingEnabled() {
 			removeFinalizer = true
-			r.Log.Info("disable debug successful for cleanup")
+			r.Log.Info("Disable debug successful for cleanup")
 		}
 
 		if r.CtrlConfig.Status.IsDebuggingFailed() {
 			removeFinalizer = true
-			r.Log.Info("failed to disable debug for cleanup")
+			r.Log.Info("Failed to disable debug for cleanup")
 		}
 	}
 
@@ -197,7 +193,7 @@ func (r *MachineConfigReconciler) cleanUp(ctx context.Context, req ctrl.Request)
 		if _, err := r.withoutFinalizers(ctx, req, finalizer); err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to remove finalizer from NodeObservabilityMachineConfig %s: %w", r.CtrlConfig.Name, err)
 		}
-		r.Log.Info("removed finalizer from NodeObservabilityMachineConfig resource, cleanup complete")
+		r.Log.Info("Removed finalizer from NodeObservabilityMachineConfig resource, cleanup complete")
 	}
 
 	return ctrl.Result{}, nil
@@ -208,7 +204,6 @@ func (r *MachineConfigReconciler) withFinalizers(ctx context.Context, req ctrl.R
 
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		if err := r.ClientGet(ctx, req.NamespacedName, withFinalizers); err != nil {
-			r.Log.Error(err, "failed to fetch nodeobservabilitymachineconfig resource for updating finalizer")
 			return err
 		}
 
@@ -218,7 +213,6 @@ func (r *MachineConfigReconciler) withFinalizers(ctx context.Context, req ctrl.R
 		withFinalizers.Finalizers = append(withFinalizers.Finalizers, finalizer)
 
 		if err := r.ClientUpdate(ctx, withFinalizers); err != nil {
-			r.Log.Error(err, "failed to update nodeobservabilitymachineconfig resource finalizers")
 			return err
 		}
 
@@ -233,7 +227,6 @@ func (r *MachineConfigReconciler) withoutFinalizers(ctx context.Context, req ctr
 
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		if err := r.ClientGet(ctx, req.NamespacedName, withoutFinalizers); err != nil {
-			r.Log.Error(err, "failed to fetch nodeobservabilitymachineconfig resource for removing finalizer")
 			return err
 		}
 
@@ -257,7 +250,6 @@ func (r *MachineConfigReconciler) withoutFinalizers(ctx context.Context, req ctr
 
 		withoutFinalizers.Finalizers = newFinalizers
 		if err := r.ClientUpdate(ctx, withoutFinalizers); err != nil {
-			r.Log.Error(err, "failed to remove nodeobservabilitymachineconfig resource finalizers")
 			return err
 		}
 
@@ -282,16 +274,14 @@ func (r *MachineConfigReconciler) updateStatus(ctx context.Context) error {
 
 	namespace := types.NamespacedName{Name: r.CtrlConfig.Name}
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		r.Log.V(3).Info("updating nodeobservabilitymachineconfig resource status")
+		r.Log.V(3).Info("Updating nodeobservabilitymachineconfig resource status")
 		nomc := &v1alpha1.NodeObservabilityMachineConfig{}
 		if err := r.ClientGet(ctx, namespace, nomc); err != nil {
-			r.Log.Error(err, "failed to fetch nodeobservabilitymachineconfig resource")
 			return err
 		}
 		r.CtrlConfig.Status.DeepCopyInto(&nomc.Status)
 
 		if err := r.ClientStatusUpdate(ctx, nomc); err != nil {
-			r.Log.Error(err, "failed to update nodeobservabilitymachineconfig resource status")
 			return err
 		}
 		nomc.DeepCopyInto(r.CtrlConfig)
@@ -308,7 +298,7 @@ func (r *MachineConfigReconciler) updateStatus(ctx context.Context) error {
 // if debugging is enabled
 func (r *MachineConfigReconciler) inspectProfilingMCReq(ctx context.Context) (bool, error) {
 	if r.CtrlConfig.Status.IsMachineConfigInProgress() {
-		r.Log.Info("previous reconcile initiated operation in progress, changes not applied")
+		r.Log.Info("Previous reconcile initiated operation in progress, changes not applied")
 		return false, nil
 	}
 
@@ -325,19 +315,20 @@ func (r *MachineConfigReconciler) ensureProfConfEnabled(ctx context.Context) (bo
 	var modCount, setEnabledCondition int
 	var err error
 	if modCount, err = r.ensureReqNodeLabelExists(ctx); err != nil {
-		r.Log.Error(err, "failed to ensure nodes are labelled")
-		// fails for even one node revert changes made
-		return true, r.revertNodeLabeling(ctx)
+		errors := []error{fmt.Errorf("failed to ensure nodes are labelled: %w", err)}
+		if errNodeLbl := r.revertNodeLabeling(ctx); errNodeLbl != nil {
+			// fails for even one node revert changes made
+			errors = append(errors, fmt.Errorf("failed to revert node labelling: %w", errNodeLbl))
+		}
+		return true, utilerrors.NewAggregate(errors)
 	}
 	setEnabledCondition += modCount
 	if modCount, err = r.ensureReqMCPExists(ctx); err != nil {
-		r.Log.Error(err, "failed to ensure mcp exists")
-		return false, err
+		return false, fmt.Errorf("failed to ensure mcp exists: %w", err)
 	}
 	setEnabledCondition += modCount
 	if modCount, err = r.ensureReqMCExists(ctx); err != nil {
-		r.Log.Error(err, "failed to ensure mc exists")
-		return false, err
+		return false, fmt.Errorf("failed to ensure mc exists: %w", err)
 	}
 	setEnabledCondition += modCount
 
@@ -355,12 +346,14 @@ func (r *MachineConfigReconciler) ensureProfConfEnabled(ctx context.Context) (bo
 // ensureProfConfDisabled is for disabling the profiling of requested services
 func (r *MachineConfigReconciler) ensureProfConfDisabled(ctx context.Context) (bool, error) {
 
-	modCount := 0
-	var err error
-	if modCount, err = r.ensureReqNodeLabelNotExists(ctx); err != nil {
-		r.Log.Error(err, "failed to ensure nodes are not labelled")
-		// fails for even one node revert changes made
-		return true, r.revertNodeUnlabeling(ctx)
+	modCount, err := r.ensureReqNodeLabelNotExists(ctx)
+	if err != nil {
+		errors := []error{fmt.Errorf("failed to ensure nodes are not labelled: %w", err)}
+		if errNodeUnLbl := r.revertNodeUnlabeling(ctx); errNodeUnLbl != nil {
+			// fails for even one node revert changes made
+			errors = append(errors, fmt.Errorf("failed to revert node unlabelling: %w", errNodeUnLbl))
+		}
+		return true, utilerrors.NewAggregate(errors)
 	}
 
 	if modCount > 0 {
@@ -418,14 +411,14 @@ func (r *MachineConfigReconciler) monitorProgress(ctx context.Context) (result c
 
 	if r.CtrlConfig.Status.IsDebuggingEnabled() {
 		if result, err = r.CheckNodeObservabilityMCPStatus(ctx); err != nil {
-			r.Log.Error(err, "failed to check nodeobservability mcp status")
+			err = fmt.Errorf("failed to check nodeobservability mcp status: %w", err)
 			return
 		}
 	}
 
 	if !r.CtrlConfig.Status.IsDebuggingEnabled() || r.CtrlConfig.Status.IsDebuggingFailed() {
 		if result, err = r.checkWorkerMCPStatus(ctx); err != nil {
-			r.Log.Error(err, "failed to check worker mcp status")
+			err = fmt.Errorf("failed to check worker mcp status: %w", err)
 			return
 		}
 	}
