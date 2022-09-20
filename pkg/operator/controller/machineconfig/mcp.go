@@ -167,8 +167,9 @@ func (r *MachineConfigReconciler) checkWorkerMCPStatus(ctx context.Context) (ctr
 		return ctrl.Result{}, err
 	}
 
-	if mcv1.IsMachineConfigPoolConditionTrue(mcp.Status.Conditions, mcv1.MachineConfigPoolUpdating) &&
-		mcp.Status.DegradedMachineCount == 0 {
+	if mcv1.IsMachineConfigPoolConditionTrue(mcp.Status.Conditions, mcv1.MachineConfigPoolUpdating) && mcp.Status.DegradedMachineCount == 0 {
+		r.Log.V(1).Info("Worker MCP is updating")
+
 		var msg string
 		if !r.CtrlConfig.Status.IsDebuggingEnabled() {
 			msg = "Machine config update to disable debugging in progress"
@@ -179,10 +180,11 @@ func (r *MachineConfigReconciler) checkWorkerMCPStatus(ctx context.Context) (ctr
 			r.CtrlConfig.Status.SetCondition(v1alpha2.DebugReady, metav1.ConditionFalse, v1alpha2.ReasonInProgress, msg)
 		}
 		r.Log.V(1).Info(msg)
-		return ctrl.Result{}, nil
+		return ctrl.Result{RequeueAfter: defaultRequeueTime}, nil
 	}
 
-	if mcv1.IsMachineConfigPoolConditionTrue(mcp.Status.Conditions, mcv1.MachineConfigPoolUpdated) {
+	if mcv1.IsMachineConfigPoolConditionTrue(mcp.Status.Conditions, mcv1.MachineConfigPoolUpdated) && mcp.Status.DegradedMachineCount == 0 {
+		r.Log.V(1).Info("Worker MCP is updated", "MCP conditions", mcp.Status.Conditions)
 
 		if err := r.disableCrioProf(ctx); err != nil {
 			return ctrl.Result{RequeueAfter: defaultRequeueTime}, err
@@ -220,6 +222,8 @@ func (r *MachineConfigReconciler) checkWorkerMCPStatus(ctx context.Context) (ctr
 			msg = fmt.Sprintf("%s, failed to revert changes, reconcile again", msg)
 			r.CtrlConfig.Status.SetCondition(v1alpha2.DebugReady, metav1.ConditionFalse, v1alpha2.ReasonInProgress, msg)
 		}
+
+		r.Log.V(1).Info(msg)
 
 		return ctrl.Result{RequeueAfter: defaultRequeueTime}, nil
 	}

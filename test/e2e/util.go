@@ -8,16 +8,15 @@ import (
 )
 
 const (
-	defaultTestName = "test-instance"
-	testNamespace   = "node-observability-operator"
+	defaultTestName   = "test-instance"
+	operatorNamespace = "node-observability-operator"
 )
 
 // testNodeObservability - minimal CR for the test
 func testNodeObservability() *operatorv1alpha2.NodeObservability {
 	return &operatorv1alpha2.NodeObservability{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "cluster",
-			Namespace: testNamespace,
+			Name: "cluster",
 		},
 		Spec: operatorv1alpha2.NodeObservabilitySpec{
 			NodeSelector: map[string]string{
@@ -33,7 +32,7 @@ func testNodeObservabilityRun(testName string) *operatorv1alpha2.NodeObservabili
 	return &operatorv1alpha2.NodeObservabilityRun{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      testName,
-			Namespace: testNamespace,
+			Namespace: operatorNamespace,
 		},
 		Spec: operatorv1alpha2.NodeObservabilityRunSpec{
 			NodeObservabilityRef: &operatorv1alpha2.NodeObservabilityRef{

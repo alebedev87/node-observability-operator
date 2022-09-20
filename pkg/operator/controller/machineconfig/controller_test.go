@@ -426,7 +426,7 @@ func TestReconcile(t *testing.T) {
 			},
 			wantErr: false,
 			asExpected: func(status v1alpha2.NodeObservabilityMachineConfigStatus, result ctrl.Result) bool {
-				if result.RequeueAfter != defaultRequeueTime ||
+				if result.RequeueAfter != 3*defaultRequeueTime ||
 					status.IsDebuggingEnabled() ||
 					!status.IsMachineConfigInProgress() ||
 					status.IsDebuggingFailed() {
@@ -600,7 +600,7 @@ func TestMonitorProgress(t *testing.T) {
 				*o = append(*o, workerMCP)
 			},
 			asExpected: func(status v1alpha2.NodeObservabilityMachineConfigStatus, result ctrl.Result) bool {
-				if result.RequeueAfter != 0 ||
+				if result.RequeueAfter != defaultRequeueTime ||
 					status.IsDebuggingEnabled() ||
 					!status.IsMachineConfigInProgress() ||
 					status.IsDebuggingFailed() {
@@ -649,7 +649,7 @@ func TestMonitorProgress(t *testing.T) {
 				*o = append(*o, workerMCP)
 			},
 			asExpected: func(status v1alpha2.NodeObservabilityMachineConfigStatus, result ctrl.Result) bool {
-				if result.RequeueAfter != 0 ||
+				if result.RequeueAfter != defaultRequeueTime ||
 					status.IsDebuggingEnabled() ||
 					!status.IsMachineConfigInProgress() ||
 					status.IsDebuggingFailed() {
@@ -671,9 +671,9 @@ func TestMonitorProgress(t *testing.T) {
 				*o = append(*o, workerMCP)
 			},
 			asExpected: func(status v1alpha2.NodeObservabilityMachineConfigStatus, result ctrl.Result) bool {
-				if result.RequeueAfter != 0 ||
+				if result.RequeueAfter != defaultRequeueTime ||
 					status.IsDebuggingEnabled() ||
-					status.IsMachineConfigInProgress() ||
+					!status.IsMachineConfigInProgress() ||
 					status.IsDebuggingFailed() {
 					return false
 				}
