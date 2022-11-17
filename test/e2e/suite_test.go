@@ -24,6 +24,9 @@ import (
 	securityv1 "github.com/openshift/api/security/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -40,12 +43,15 @@ import (
 	//+kubebuilder:scaffold:imports
 )
 
-var cfg *rest.Config
-var k8sClient client.Client
-
-// nodesWithoutOperator is a list of nodes on which the operator is not scheduled,
-// restarting them is not supposed to result in the loss of the operator logs.
-var nodesWithoutOperator *corev1.NodeList
+var (
+	cfg          *rest.Config
+	k8sClient    client.Client
+	k8sClientSet *kubernetes.Clientset
+	// nodesWithoutOperator is a list of nodes on which the operator is not scheduled,
+	// restarting them is not supposed to result in the loss of the operator logs.
+	nodesWithoutOperator *corev1.NodeList
+	schemeGroupVersion   = schema.GroupVersion{Group: "", Version: "v1"}
+)
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -76,6 +82,13 @@ var _ = BeforeSuite(func() {
 	cfg, err = config.GetConfig()
 	Expect(err).NotTo(HaveOccurred())
 
+	cfg.APIPath = "/api"
+	cfg.GroupVersion = &schemeGroupVersion
+	cfg.NegotiatedSerializer = serializer.WithoutConversionCodecFactory{CodecFactory: scheme.Codecs}
+
+	k8sClientSet, err = kubernetes.NewForConfig(cfg)
+	Expect(err).NotTo(HaveOccurred())
+
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
@@ -99,5 +112,5 @@ var _ = BeforeSuite(func() {
 			nodesWithoutOperator.Items = append(nodesWithoutOperator.Items, n)
 		}
 	}
-	Expect(len(nodesWithoutOperator.Items)).To(Not(BeZero()))
+	//Expect(len(nodesWithoutOperator.Items)).To(Not(BeZero()))
 })

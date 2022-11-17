@@ -141,7 +141,7 @@ func (r *NodeObservabilityReconciler) updateDaemonset(ctx context.Context, curre
 
 // desiredDaemonSet returns a DaemonSet object
 func (r *NodeObservabilityReconciler) desiredDaemonSet(nodeObs *v1alpha2.NodeObservability, sa *corev1.ServiceAccount, ns, kubeletCAConfigMapName, kubeletCAHash string) *appsv1.DaemonSet {
-	ls := labelsForNodeObservability(nodeObs.Name)
+	ls := LabelsForNodeObservability(nodeObs.Name)
 	annotations := map[string]string{
 		kubeletCAAnnotation: kubeletCAHash,
 	}

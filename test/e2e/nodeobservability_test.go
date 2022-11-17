@@ -32,6 +32,7 @@ import (
 
 	operatorv1alpha1 "github.com/openshift/node-observability-operator/api/v1alpha1"
 	operatorv1alpha2 "github.com/openshift/node-observability-operator/api/v1alpha2"
+	nobctrl "github.com/openshift/node-observability-operator/pkg/operator/controller/nodeobservability"
 )
 
 var (
@@ -89,6 +90,19 @@ var _ = Describe("Node Observability Operator end-to-end test suite", Ordered, f
 					return run.Status.FinishedTimestamp.IsZero()
 				}, 900, time.Second).Should(BeFalse())
 				Expect(run.Status.FailedAgents).To(BeEmpty())
+			})
+
+			By("by collecting generated files", func() {
+				listOpts := []client.ListOption{
+					client.MatchingLabels(nobctrl.LabelsForNodeObservability(nodeobservability.Name)),
+				}
+
+				podList := &corev1.PodList{}
+				Expect(k8sClient.List(ctx, podList, listOpts...)).To(Succeed())
+
+				for _, pod := range podList.Items {
+					Expect(verifyPodPprofData(cfg, k8sClientSet, pod.Name)).To(BeNil())
+				}
 			})
 		})
 

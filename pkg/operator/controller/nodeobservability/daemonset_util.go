@@ -11,6 +11,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+// LabelsForNodeObservability returns the labels for selecting the resources
+// belonging to the given node observability CR name.
+func LabelsForNodeObservability(name string) map[string]string {
+	return map[string]string{"app": "nodeobservability", "nodeobs_cr": name}
+}
+
 // indexedVolumeMount is the standard core volume mount with additional index field
 type indexedVolumeMount struct {
 	corev1.VolumeMount
@@ -27,12 +33,6 @@ type indexedContainer struct {
 type indexedVolume struct {
 	corev1.Volume
 	Index int
-}
-
-// labelsForNodeObservability returns the labels for selecting the resources
-// belonging to the given node observability CR name.
-func labelsForNodeObservability(name string) map[string]string {
-	return map[string]string{"app": "nodeobservability", "nodeobs_cr": name}
 }
 
 // buildIndexedVolumeMountMap builds a map from the given list of volume mounts,

@@ -674,7 +674,7 @@ func (b *testDaemonsetBuilder) withEmptyDirVolume(name string) *testDaemonsetBui
 }
 
 func (b *testDaemonsetBuilder) build() *appsv1.DaemonSet {
-	labels := labelsForNodeObservability(nodeObsInstanceName)
+	labels := LabelsForNodeObservability(nodeObsInstanceName)
 	d := &appsv1.DaemonSet{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "DaemonSet",
@@ -687,7 +687,7 @@ func (b *testDaemonsetBuilder) build() *appsv1.DaemonSet {
 		},
 		Spec: appsv1.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{
-				MatchLabels: labelsForNodeObservability(nodeObsInstanceName),
+				MatchLabels: LabelsForNodeObservability(nodeObsInstanceName),
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{

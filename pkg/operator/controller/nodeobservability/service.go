@@ -126,7 +126,7 @@ func (r *NodeObservabilityReconciler) updateService(ctx context.Context, current
 
 // desiredService returns a service object
 func (r *NodeObservabilityReconciler) desiredService(nodeObs *v1alpha2.NodeObservability, ns string) *corev1.Service {
-	ls := labelsForNodeObservability(nodeObs.Name)
+	ls := LabelsForNodeObservability(nodeObs.Name)
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ns,
